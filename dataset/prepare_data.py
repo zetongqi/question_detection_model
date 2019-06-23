@@ -23,7 +23,7 @@ def data_reader(FILE_PATH):
 	for row in tsvFile:
 		X.append(row[0])
 		y.append(row[1])
-	return X, y
+	return (X, y)
 
 
 # tokenization method
@@ -34,10 +34,13 @@ def tokenize(sequence):
 # generator for tf.data.Dataset object
 def data_generator(X, y):
 	vectors = get_mag_model(MAG_FILE)
+
+	def pad_zeros()
+
 	for x, y in zip(X, y):
 		yield vectors.query(tokenize(x)), y
 
 
 # returns tf.data.Dataset object for model.fit
 def prepare_data(generator):
-	tf.data.Dataset.from_generator(generator, (tf.int64, tf.uint8), )
+	tf.data.Dataset.from_generator(generator, (tf.float32, tf.uint8), (tf.TensorShape([]), tf.TensorShape([None])))
