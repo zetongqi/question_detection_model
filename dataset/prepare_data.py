@@ -1,7 +1,7 @@
 import os
 import sys
 import tensorflow as tf
-from process_raw import PROCESSED_TRAIN, PROCESSED_VAL
+from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 import csv
 from nltk.tokenize import word_tokenize
 

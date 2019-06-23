@@ -1,4 +1,4 @@
-from qnli import TRAIN, VAL, TEST
+from dataset.qnli import TRAIN, VAL, TEST
 import csv
 import os
 
