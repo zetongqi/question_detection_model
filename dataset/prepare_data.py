@@ -4,6 +4,8 @@ import tensorflow as tf
 from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 import csv
 from nltk.tokenize import word_tokenize
+import nltk
+nltk.download('punkt')
 
 # fixes import issues
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -38,11 +40,11 @@ class DataWrapper:
     # generator for tf.data.Dataset object
     def data_generator(self):
         def pad_zeros(x, max_seq_len):
-            if len(x) >= max_seq_len:
+            if x.shape[0] >= max_seq_len:
                 return x[0:max_seq_len, :]
             else:
                 return np.concatenate(
-                    (x, np.zeros(max_seq_len - len(x), vectors.dim)), axis=0
+                    (x, np.zeros((max_seq_len - x.shape[0], x.shape[1]))), axis=0
                 )
 
         for x, y in zip(self.X, self.y):
