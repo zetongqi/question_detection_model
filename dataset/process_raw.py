@@ -1,6 +1,10 @@
+import os
+import sys
+# fixes import issues
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from dataset.qnli import TRAIN, VAL, TEST
 import csv
-import os
+
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESSED = os.path.join(DIR, "processed")
