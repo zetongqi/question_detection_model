@@ -27,15 +27,16 @@ class DataWrapper:
         tsvFile = csv.reader(open(self.FILE_PATH), delimiter="\t")
         for row in tsvFile:
             X.append(row[0])
-            y.append(row[1])
-        return (X, y)
+            y.append(int(row[1] == "1"))
+        self.X = X
+        self.y = y
 
     # tokenization method
     def tokenize(self, sequence):
         return word_tokenize(sequence)
 
     # generator for tf.data.Dataset object
-    def data_generator(self, X, y):
+    def data_generator(self):
         def pad_zeros(x, max_seq_len):
             if len(x) >= max_seq_len:
                 return x[0:max_seq_len]
@@ -44,13 +45,25 @@ class DataWrapper:
                     (x, np.zeros(max_seq_len - len(x), vectors.dim)), axis=0
                 )
 
-        for x, y in zip(X, y):
+        for x, y in zip(self.X, self.y):
             yield (pad_zeros(self.vectors.query(tokenize(x)), self.MAX_SEQ_LEN), y)
 
     # returns tf.data.Dataset object for model.fit
-    def prepare_data():
-        tf.data.Dataset.from_generator(
-            self.data_generator,
-            (tf.float32, tf.uint8),
-            (tf.TensorShape([]), tf.TensorShape([None])),
+    def get_dataset(self):
+        dataset = (
+            tf.data.Dataset.from_generator(
+                self.data_generator,
+                (tf.float32, tf.uint8),
+                (tf.TensorShape([]), tf.TensorShape([None])),
+            )
+            .shuffle(2000)
+            .batch(self.BATCH_SIZE)
         )
+        return dataset
+
+
+# test
+if __name__ == "__main__":
+    wrapper = DataWrapper(PROCESSED_TRAIN, MAG_FILE)
+    wrapper.data_reader()
+    print(type(wrapper.get_dataset()))
