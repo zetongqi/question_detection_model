@@ -4,43 +4,53 @@ import tensorflow as tf
 from process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 import csv
 from nltk.tokenize import word_tokenize
+
 # fixes import issues
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from mag_model.mag_model import MAG_FILE
 from pymagnitude import *
+import numpy as np
 
 
-# returns magnitude object
-def get_mag_model(MAG_PATH):
-	return Magnitude(MAG_PATH)
+class DataWrapper:
+    def __init__(self, datafile_path, mag_file_path, batch_size=32, max_seq_len=200):
+        self.FILE_PATH = datafile_path
+        self.MAG_FILE = mag_file_path
+        self.BATCH_SIZE = batch_size
+        self.MAX_SEQ_LEN = max_seq_len
+        self.vectors = Magnitude(self.MAG_FILE)
 
+    # reads the processed data and return data matrices
+    def data_reader(self):
+        X = []
+        y = []
+        tsvFile = csv.reader(open(self.FILE_PATH), delimiter="\t")
+        for row in tsvFile:
+            X.append(row[0])
+            y.append(row[1])
+        return (X, y)
 
-# reads the processed data and return data matrices
-def data_reader(FILE_PATH):
-	X = []
-	y = []
-	tsvFile = csv.reader(open(FILE_PATH), delimiter='\t')
-	for row in tsvFile:
-		X.append(row[0])
-		y.append(row[1])
-	return (X, y)
+    # tokenization method
+    def tokenize(self, sequence):
+        return word_tokenize(sequence)
 
+    # generator for tf.data.Dataset object
+    def data_generator(self, X, y):
+        def pad_zeros(x, max_seq_len):
+            if len(x) >= max_seq_len:
+                return x[0:max_seq_len]
+            else:
+                return np.concatenate(
+                    (x, np.zeros(max_seq_len - len(x), vectors.dim)), axis=0
+                )
 
-# tokenization method
-def tokenize(sequence):
-	return word_tokenize(sequence)
+        for x, y in zip(X, y):
+            yield (pad_zeros(self.vectors.query(tokenize(x)), self.MAX_SEQ_LEN), y)
 
-
-# generator for tf.data.Dataset object
-def data_generator(X, y):
-	vectors = get_mag_model(MAG_FILE)
-
-	def pad_zeros()
-
-	for x, y in zip(X, y):
-		yield vectors.query(tokenize(x)), y
-
-
-# returns tf.data.Dataset object for model.fit
-def prepare_data(generator):
-	tf.data.Dataset.from_generator(generator, (tf.float32, tf.uint8), (tf.TensorShape([]), tf.TensorShape([None])))
+    # returns tf.data.Dataset object for model.fit
+    def prepare_data():
+        tf.data.Dataset.from_generator(
+            self.data_generator,
+            (tf.float32, tf.uint8),
+            (tf.TensorShape([]), tf.TensorShape([None])),
+        )

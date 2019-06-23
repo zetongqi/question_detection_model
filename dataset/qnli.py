@@ -10,11 +10,11 @@ TRAIN = os.path.join(RAW, "QNLI", "train.tsv")
 VAL = os.path.join(RAW, "QNLI", "dev.tsv")
 TEST = os.path.join(RAW, "QNLI", "test.tsv")
 
-if __name__ == '__main__':
-	if not os.path.exists(ZIP_FILE):
-		print("downloading QNLI dataset")
-		os.mkdir(RAW)
-		urllib.request.urlretrieve(DOWNLOAD_URL, ZIP_FILE)
-		zip_ref = zipfile.ZipFile(ZIP_FILE, 'r')
-		zip_ref.extractall(RAW)
-		zip_ref.close()
+if __name__ == "__main__":
+    if not os.path.exists(ZIP_FILE):
+        print("downloading QNLI dataset")
+        os.mkdir(RAW)
+        urllib.request.urlretrieve(DOWNLOAD_URL, ZIP_FILE)
+        zip_ref = zipfile.ZipFile(ZIP_FILE, "r")
+        zip_ref.extractall(RAW)
+        zip_ref.close()
