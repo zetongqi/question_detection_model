@@ -21,7 +21,7 @@ class DataWrapper:
         self.vectors = Magnitude(self.MAG_FILE)
 
     # reads the processed data and return data matrices
-    def data_reader(self):
+    def read_data(self):
         X = []
         y = []
         tsvFile = csv.reader(open(self.FILE_PATH), delimiter="\t")
@@ -39,24 +39,27 @@ class DataWrapper:
     def data_generator(self):
         def pad_zeros(x, max_seq_len):
             if len(x) >= max_seq_len:
-                return x[0:max_seq_len]
+                return x[0:max_seq_len, :]
             else:
                 return np.concatenate(
                     (x, np.zeros(max_seq_len - len(x), vectors.dim)), axis=0
                 )
 
         for x, y in zip(self.X, self.y):
-            yield (pad_zeros(self.vectors.query(tokenize(x)), self.MAX_SEQ_LEN), y)
+            yield pad_zeros(self.vectors.query(self.tokenize(x)), self.MAX_SEQ_LEN), y
 
     # returns tf.data.Dataset object for model.fit
     def get_dataset(self):
         dataset = (
             tf.data.Dataset.from_generator(
                 self.data_generator,
-                (tf.float32, tf.uint8),
-                (tf.TensorShape([]), tf.TensorShape([None])),
+                output_types=(tf.float32, tf.uint8),
+                output_shapes=(
+                    tf.TensorShape((self.MAX_SEQ_LEN, self.vectors.dim)),
+                    tf.TensorShape([]),
+                    ),
             )
-            .shuffle(2000)
+            .shuffle(buffer_size=2000)
             .batch(self.BATCH_SIZE)
         )
         return dataset
@@ -65,5 +68,5 @@ class DataWrapper:
 # test
 if __name__ == "__main__":
     wrapper = DataWrapper(PROCESSED_TRAIN, MAG_FILE)
-    wrapper.data_reader()
+    wrapper.read_data()
     print(type(wrapper.get_dataset()))
