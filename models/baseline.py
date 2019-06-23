@@ -72,6 +72,7 @@ class Model:
                     )
                 ),
             )
+        self.model.save(MODEL_FILE)
 
 
 # testing
