@@ -2,10 +2,7 @@ import tensorflow as tf
 import os
 import sys
 import math
-
-# fixes import issues
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from dataset.prepare_data import DataWrapper
+from dataset.prepare_data import DataWrapperV2
 from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 from mag_model.mag_model import MAG_FILE
 
@@ -20,20 +17,19 @@ class Model:
         val_datafile_path,
         mag_file_path,
         batch_size=32,
-        max_seq_len=200,
+        max_seq_len=100,
+        epochs=2
     ):
         # training data
-        self.train_data_wrapper = DataWrapper(
+        self.train_data_wrapper = DataWrapperV2(
             train_datafile_path, mag_file_path, batch_size, max_seq_len
         )
-        # read the data to initialize the data generator
-        self.train_data_wrapper.read_data()
         # validation data
-        self.val_data_wrapper = DataWrapper(
+        self.val_data_wrapper = DataWrapperV2(
             val_datafile_path, mag_file_path, batch_size, max_seq_len
         )
-        self.val_data_wrapper.read_data()
         self.model = None
+        self.epochs=epochs
 
     def build_model(self):
         print("building model")
@@ -44,24 +40,23 @@ class Model:
             )
         )
         Bidir_LSTM = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(100, activation="tanh", return_sequences=True),
+            tf.keras.layers.LSTM(128, activation="tanh"),
             merge_mode="concat",
         )
         Bidir_LSTM_out = Bidir_LSTM(i)
-        maxpool = tf.keras.layers.GlobalMaxPooling1D()(Bidir_LSTM_out)
-        hidden = tf.keras.layers.Dense(512)(maxpool)
+        hidden = tf.keras.layers.Dense(32)(Bidir_LSTM_out)
         output = tf.keras.layers.Dense(1, activation="softmax")(hidden)
         model = tf.keras.Model(inputs=i, outputs=output)
         model.summary()
         model.compile(loss="binary_crossentropy", optimizer="adam", metrics=["acc"])
         self.model = model
-        self.model.save(MODEL_FILE)
 
     def train(self):
         # if the model is not build
         if self.model == None:
             self.build_model()
         else:
+            print("fitting model")
             self.model.fit(
                 self.train_data_wrapper.get_dataset(),
                 validation_data=self.val_data_wrapper.get_dataset(),
@@ -71,6 +66,13 @@ class Model:
                         / self.train_data_wrapper.BATCH_SIZE
                     )
                 ),
+                validation_steps=int(
+                    math.floor(
+                        len(self.val_data_wrapper.X)
+                        / self.val_data_wrapper.BATCH_SIZE
+                    )
+                ),
+                epochs=self.epochs
             )
         self.model.save(MODEL_FILE)
 
