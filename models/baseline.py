@@ -15,10 +15,11 @@ class Model:
         self,
         train_datafile_path,
         val_datafile_path,
+        test_datafile_path,
         mag_file_path,
         batch_size=32,
         max_seq_len=100,
-        epochs=2
+        epochs=2,
     ):
         # training data
         self.train_data_wrapper = DataWrapperV2(
@@ -28,8 +29,12 @@ class Model:
         self.val_data_wrapper = DataWrapperV2(
             val_datafile_path, mag_file_path, batch_size, max_seq_len
         )
+        # test data
+        self.test_data_wrapper = DataWrapperV2(
+            test_datafile_path, mag_file_path, batch_size, max_seq_len
+        )
         self.model = None
-        self.epochs=epochs
+        self.epochs = epochs
 
     def build_model(self):
         print("building model")
@@ -40,11 +45,12 @@ class Model:
             )
         )
         Bidir_LSTM = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(128, activation="tanh"),
+            tf.keras.layers.LSTM(128, activation="tanh", return_sequences=True),
             merge_mode="concat",
         )
         Bidir_LSTM_out = Bidir_LSTM(i)
-        hidden = tf.keras.layers.Dense(32)(Bidir_LSTM_out)
+        maxpool = tf.keras.layers.GlobalMaxPooling1D()(Bidir_LSTM_out)
+        hidden = tf.keras.layers.Dense(128)(maxpool)
         output = tf.keras.layers.Dense(1, activation="softmax")(hidden)
         model = tf.keras.Model(inputs=i, outputs=output)
         model.summary()
@@ -59,7 +65,7 @@ class Model:
             print("fitting model")
             self.model.fit(
                 self.train_data_wrapper.get_dataset(),
-                validation_data=self.val_data_wrapper.get_dataset(),
+                validation_data=self.val_data_wrapper.get_dataset(training=False),
                 steps_per_epoch=int(
                     math.floor(
                         len(self.train_data_wrapper.X)
@@ -68,17 +74,24 @@ class Model:
                 ),
                 validation_steps=int(
                     math.floor(
-                        len(self.val_data_wrapper.X)
-                        / self.val_data_wrapper.BATCH_SIZE
+                        len(self.val_data_wrapper.X) / self.val_data_wrapper.BATCH_SIZE
                     )
                 ),
-                epochs=self.epochs
+                epochs=self.epochs,
             )
         self.model.save(MODEL_FILE)
+
+    def evaluate(self):
+        if self.model == None:
+            self.train()
+        else:
+            print("evaluating model on test set")
+            testdata = self.test_data_wrapper.get_dataset(training=False)
+            self.model.evaluate(testdata, verbose=0)
 
 
 # testing
 if __name__ == "__main__":
-    model = Model(PROCESSED_TRAIN, PROCESSED_VAL, MAG_FILE)
+    model = Model(PROCESSED_TRAIN, PROCESSED_VAL, PROCESSED_VAL, MAG_FILE)
     model.build_model()
     model.train()

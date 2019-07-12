@@ -5,7 +5,8 @@ from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 import csv
 from nltk.tokenize import word_tokenize
 import nltk
-nltk.download('punkt')
+
+nltk.download("punkt")
 from mag_model.mag_model import MAG_FILE
 from pymagnitude import *
 import numpy as np
@@ -58,12 +59,13 @@ class DataWrapper:
                 output_shapes=(
                     tf.TensorShape((self.MAX_SEQ_LEN, self.vectors.dim)),
                     tf.TensorShape([]),
-                    ),
+                ),
             )
             .shuffle(buffer_size=2000)
             .batch(self.BATCH_SIZE)
         )
         return dataset
+
 
 class DataWrapperV2:
     def __init__(self, datafile_path, mag_file_path, batch_size=32, max_seq_len=100):
@@ -118,14 +120,13 @@ class DataWrapperV2:
             X.set_shape([self.MAX_SEQ_LEN, self.vectors.dim])
             y.set_shape([])
             return X, y
+
         dataset = dataset.map(_process_datapair)
         return dataset.shuffle(buffer_size=1000).batch(self.BATCH_SIZE).prefetch(8)
 
     def get_dataset(self):
         self.read_data()
         return self.prepare_dataset()
-
-
 
 
 # test
@@ -136,4 +137,3 @@ if __name__ == "__main__":
     for d in iter(dataset):
         print(d)
         break
-    
