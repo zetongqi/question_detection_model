@@ -5,14 +5,14 @@ from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 import csv
 from nltk.tokenize import word_tokenize
 import nltk
-
-nltk.download("punkt")
 from mag_model.mag_model import MAG_FILE
 from pymagnitude import *
 import numpy as np
+from keras.utils import to_categorical
 
 
-# deprecated
+
+# deprecated use DataWrapperV2 instead
 class DataWrapper:
     def __init__(self, datafile_path, mag_file_path, batch_size=32, max_seq_len=100):
         self.FILE_PATH = datafile_path
@@ -84,16 +84,15 @@ class DataWrapperV2:
             X.append(row[0])
             y.append(int(row[1] == "1"))
         self.X = X
-        self.y = y
+        self.y = to_categorical(y)
 
     # tokenization method
     def tokenize(self, sequence):
         return word_tokenize(sequence)
 
-    def prepare_dataset(self, training=True):
+    def prepare_dataset(self):
         dataset = tf.data.Dataset.from_tensor_slices((self.X, self.y))
-        if training:
-            dataset.repeat()
+        dataset.repeat()
 
         def _process_string(x):
 
@@ -131,9 +130,11 @@ class DataWrapperV2:
 
 # test
 if __name__ == "__main__":
+    nltk.download("punkt")
     tf.enable_eager_execution()
-    wrapper = DataWrapperV2(PROCESSED_TRAIN, MAG_FILE)
-    dataset = wrapper.get_dataset()
-    for d in iter(dataset):
-        print(d)
-        break
+    wrapper = bert_dataWrapper(PROCESSED_TRAIN)
+    wrapper.read_data()
+    X, y = wrapper.get_tokenized_data()
+    print(X)
+    print(y)
+    

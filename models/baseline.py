@@ -1,97 +1,82 @@
 import tensorflow as tf
+import keras
 import os
 import sys
 import math
-from dataset.prepare_data import DataWrapperV2
 from dataset.process_raw import PROCESSED_TRAIN, PROCESSED_VAL
 from mag_model.mag_model import MAG_FILE
+from models.get_bert import BERT_DIR, CHECKPOINT_FILE, CONFIG_JSON, VOCAB_FILE
+from keras_bert import load_trained_model_from_checkpoint, Tokenizer
+from keras.utils import to_categorical
+import json
+import tokenization
+import csv
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_FILE = os.path.join(DIR, "model.h5")
 
 
+def bert_tokenize(input_str):
+    tokenizer = tokenization.FullTokenizer(vocab_file=VOCAB_FILE, do_lower_case=True)
+    tokens_temp = tokenizer.tokenize(input_str)
+    tokens = []
+    tokens.append("[CLS]")
+    tokens.extend(tokens_temp)
+    tokens.append("[SEP]")
+    token_index = tokenizer.convert_tokens_to_ids(tokens)
+    seg_id = [0] * len(tokens)
+    return (token_index, seg_id)
+
+
+# reads the processed data and return data matrices
+def read_data(datafile_path):
+    X = []
+    y = []
+    tsvFile = csv.reader(open(datafile_path), delimiter="\t")
+    for row in tsvFile:
+        X.append(row[0])
+        y.append(int(row[1] == "1"))
+    return X, y
+
+
+def data_generator_from_file(path, batch_size=16):
+    X, y = read_data(path)
+    while True:
+        for feature, label in zip(X, y):
+            feature = bert_tokenize(feature)
+            yield (
+                {"Input-Token": feature[0], "Input-Segment": feature[1]},
+                {"dense_1": label},
+            )
+
+
 class Model:
-    def __init__(
-        self,
-        train_datafile_path,
-        val_datafile_path,
-        test_datafile_path,
-        mag_file_path,
-        batch_size=32,
-        max_seq_len=100,
-        epochs=2,
-    ):
-        # training data
-        self.train_data_wrapper = DataWrapperV2(
-            train_datafile_path, mag_file_path, batch_size, max_seq_len
-        )
-        # validation data
-        self.val_data_wrapper = DataWrapperV2(
-            val_datafile_path, mag_file_path, batch_size, max_seq_len
-        )
-        # test data
-        self.test_data_wrapper = DataWrapperV2(
-            test_datafile_path, mag_file_path, batch_size, max_seq_len
-        )
-        self.model = None
-        self.epochs = epochs
+    def __init__(self, max_seq_len=128, batch_size=16):
+        self.max_seq_len = max_seq_len
+        self.batch_size = batch_size
 
     def build_model(self):
-        print("building model")
-        i = tf.keras.layers.Input(
-            shape=(
-                self.train_data_wrapper.MAX_SEQ_LEN,
-                self.train_data_wrapper.vectors.dim,
-            )
-        )
-        Bidir_LSTM = tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(128, activation="tanh", return_sequences=True),
-            merge_mode="concat",
-        )
-        Bidir_LSTM_out = Bidir_LSTM(i)
-        maxpool = tf.keras.layers.GlobalMaxPooling1D()(Bidir_LSTM_out)
-        hidden = tf.keras.layers.Dense(128)(maxpool)
-        output = tf.keras.layers.Dense(1, activation="softmax")(hidden)
-        model = tf.keras.Model(inputs=i, outputs=output)
-        model.summary()
+        basemodel = load_trained_model_from_checkpoint(CONFIG_JSON, CHECKPOINT_FILE)
+        x = basemodel(basemodel.inputs)
+        avg_pooling = keras.layers.GlobalAveragePooling1D()(x)
+        dropout = keras.layers.Dropout(0.5)(avg_pooling)
+        out = keras.layers.Dense(2, activation="softmax")(dropout)
+        model = keras.Model(inputs=basemodel.inputs, outputs=out)
         model.compile(loss="binary_crossentropy", optimizer="adam", metrics=["acc"])
+        model.summary()
         self.model = model
 
-    def train(self):
-        # if the model is not build
+    def train(self, TRAIN_FILE):
         if self.model == None:
             self.build_model()
         else:
-            print("fitting model")
-            self.model.fit(
-                self.train_data_wrapper.get_dataset(),
-                validation_data=self.val_data_wrapper.get_dataset(training=False),
-                steps_per_epoch=int(
-                    math.floor(
-                        len(self.train_data_wrapper.X)
-                        / self.train_data_wrapper.BATCH_SIZE
-                    )
-                ),
-                validation_steps=int(
-                    math.floor(
-                        len(self.val_data_wrapper.X) / self.val_data_wrapper.BATCH_SIZE
-                    )
-                ),
-                epochs=self.epochs,
+            self.model.fit_generator(
+                data_generator_from_file(TRAIN_FILE), steps_per_epoch=1, epochs=1
             )
-        self.model.save(MODEL_FILE)
-
-    def evaluate(self):
-        if self.model == None:
-            self.train()
-        else:
-            print("evaluating model on test set")
-            testdata = self.test_data_wrapper.get_dataset(training=False)
-            self.model.evaluate(testdata, verbose=0)
 
 
 # testing
 if __name__ == "__main__":
-    model = Model(PROCESSED_TRAIN, PROCESSED_VAL, PROCESSED_VAL, MAG_FILE)
-    model.build_model()
-    model.train()
+    bert = Model()
+    bert.build_model()
+    bert.train(PROCESSED_TRAIN)
