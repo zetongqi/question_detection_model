@@ -11,17 +11,20 @@ from keras.utils import to_categorical
 import json
 import tokenization
 import csv
+import numpy as np
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_FILE = os.path.join(DIR, "model.h5")
 
 
-def bert_tokenize(input_str):
+def bert_tokenize(input_str, max_seq_len=512):
     tokenizer = tokenization.FullTokenizer(vocab_file=VOCAB_FILE, do_lower_case=True)
     tokens_temp = tokenizer.tokenize(input_str)
     tokens = []
     tokens.append("[CLS]")
     tokens.extend(tokens_temp)
+    paddings = ["[PAD]"] * (max_seq_len - len(tokens_temp) - 2)
+    tokens.extend(paddings)
     tokens.append("[SEP]")
     token_index = tokenizer.convert_tokens_to_ids(tokens)
     seg_id = [0] * len(tokens)
@@ -39,17 +42,6 @@ def read_data(datafile_path):
     return X, y
 
 
-def data_generator_from_file(path, batch_size=16):
-    X, y = read_data(path)
-    while True:
-        for feature, label in zip(X, y):
-            feature = bert_tokenize(feature)
-            yield (
-                {"Input-Token": feature[0], "Input-Segment": feature[1]},
-                {"dense_1": label},
-            )
-
-
 class Model:
     def __init__(self, max_seq_len=128, batch_size=16):
         self.max_seq_len = max_seq_len
@@ -62,21 +54,16 @@ class Model:
         dropout = keras.layers.Dropout(0.5)(avg_pooling)
         out = keras.layers.Dense(2, activation="softmax")(dropout)
         model = keras.Model(inputs=basemodel.inputs, outputs=out)
-        model.compile(loss="binary_crossentropy", optimizer="adam", metrics=["acc"])
+        model.compile(keras.optimizers.Adam(1e-5), "sparse_categorical_crossentropy", metrics=["acc"])
         model.summary()
         self.model = model
 
     def train(self, TRAIN_FILE):
         if self.model == None:
             self.build_model()
-        else:
-            self.model.fit_generator(
-                data_generator_from_file(TRAIN_FILE), steps_per_epoch=1, epochs=1
-            )
 
 
 # testing
 if __name__ == "__main__":
     bert = Model()
     bert.build_model()
-    bert.train(PROCESSED_TRAIN)
